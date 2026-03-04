@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-900">
+
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="font-semibold tracking-wide">User Registry</div>
+
+      <div class="flex items-center gap-3">
+        <div id="welcome" class="text-sm text-gray-500"></div>
+        <button onclick="logout()"
+          class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="bg-white border border-gray-200 rounded-xl shadow-sm">
+        <div class="p-5">
+          <h2 class="text-lg font-semibold">Register</h2>
+          <p class="text-sm text-gray-500 mt-1">Add a new user to the list.</p>
+
+          <form id="registerForm" onsubmit="saveUser(event)" class="mt-4 space-y-4">
+            
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Full Name</label>
+              <input id="fullName" type="text" placeholder="John Doe" required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Email</label>
+              <input id="email" type="email" placeholder="john@example.com" required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Phone</label>
+              <input id="phone" type="tel" placeholder="012 345 678" required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+
+            <div class="flex justify-end gap-2">
+              <button type="reset"
+                class="px-3 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">
+                Clear
+              </button>
+              <button type="submit"
+                class="px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                Submit
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </section>
+
+      <section class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Stored Users</h2>
+
+            <button onclick="clearUsers()"
+              class="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">
+              Clear All
+            </button>
+          </div>
+
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-left text-sm border border-gray-200 rounded-lg" id="userTable">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2">#</th>
+                  <th class="px-3 py-2">Full Name</th>
+                  <th class="px-3 py-2">Email</th>
+                  <th class="px-3 py-2">Phone</th>
+                  <th class="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="userTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div id="toast" class="fixed right-4 bottom-4 grid gap-2 z-50"></div>
+
+  <script>
+    // Cookie
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+    }
+    function deleteCookie(name) {
+      document.cookie = `${name}=; Max-Age=0; path=/`;
+    }
+
+    window.onload = function () {
+      const username = getCookie("username");
+      if (!username) {
+        window.location.href = "login.html";
+        return;
+      }
+      document.getElementById("welcome").textContent = `Welcome, ${username}`;
+      loadTable();
+    };
+
+    function logout() {
+      deleteCookie("username");
+      window.location.href = "login.html";
+    }
+
+    // Localstorage helpers
+    function getUsers() {
+      return JSON.parse(localStorage.getItem("users")) || [];
+    }
+    function setUsers(users) {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+
+    // Save user
+    function saveUser(event) {
+      event.preventDefault();
+
+      const fullName = document.getElementById("fullName").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+
+      if (fullName.length < 2) return showToast("Name must be at least 2 characters", "error");
+      if (!validateEmail(email)) return showToast("Invalid email format", "error");
+      if (phone.length < 6) return showToast("Phone is too short", "error");
+
+      const users = getUsers();
+      if (users.some(u => u.email.toLowerCase() === email.toLowerCase()))
+        return showToast("Email already exists", "error");
+
+      users.push({ fullName, email, phone });
+      setUsers(users);
+
+      document.getElementById("registerForm").reset();
+      loadTable();
+      showToast("User saved successfully", "success");
+    }
+
+    function validateEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    // Table load
+    function loadTable() {
+      const users = getUsers();
+      const tbody = document.getElementById("userTableBody");
+      tbody.innerHTML = "";
+
+      users.forEach((u, i) => {
+        const tr = document.createElement("tr");
+        tr.className = i % 2 ? "bg-white" : "bg-gray-50";
+
+        tr.innerHTML = `
+          <td class="px-3 py-2">${i + 1}</td>
+          <td class="px-3 py-2 font-medium">${u.fullName}</td>
+          <td class="px-3 py-2">${u.email}</td>
+          <td class="px-3 py-2">${u.phone}</td>
+          <td class="px-3 py-2 text-right">
+            <button onclick="editUser(${i})"
+              class="px-2 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Edit</button>
+            <button onclick="deleteUser(${i})"
+              class="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Delete user
+    function deleteUser(i) {
+      const users = getUsers();
+      users.splice(i, 1);
+      setUsers(users);
+      loadTable();
+      showToast("User deleted", "success");
+    }
+
+    // Edit user
+    function editUser(i) {
+      const users = getUsers();
+      const u = users[i];
+
+      document.getElementById("fullName").value = u.fullName;
+      document.getElementById("email").value = u.email;
+      document.getElementById("phone").value = u.phone;
+
+      const form = document.getElementById("registerForm");
+
+      form.onsubmit = function (e) {
+        e.preventDefault();
+
+        const fullName = document.getElementById("fullName").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const phone = document.getElementById("phone").value.trim();
+
+        const others = users.filter((_, idx) => idx !== i);
+        if (others.some(u => u.email.toLowerCase() === email.toLowerCase()))
+          return showToast("Email already exists", "error");
+
+        users[i] = { fullName, email, phone };
+        setUsers(users);
+        loadTable();
+
+        form.reset();
+        form.onsubmit = saveUser;
+
+        showToast("User updated", "success");
+      };
+
+      showToast("Editing mode: Update and submit", "info");
+    }
+
+    // Clear all
+    function clearUsers() {
+      if (!confirm("Clear all users?")) return;
+      localStorage.removeItem("users");
+      loadTable();
+      showToast("All users cleared", "success");
+    }
+
+    function showToast(msg, type = "info") {
+      const toast = document.getElementById("toast");
+      const colors = {
+        success: "bg-emerald-600",
+        error: "bg-red-600",
+        info: "bg-gray-800",
+        warning: "bg-amber-600",
+      };
+
+      const div = document.createElement("div");
+      div.className = `text-sm text-white px-3 py-2 rounded-lg shadow ${colors[type]}`;
+      div.textContent = msg;
+
+      toast.appendChild(div);
+
+      setTimeout(() => {
+        div.classList.add("opacity-0");
+        setTimeout(() => div.remove(), 200);
+      }, 2000);
+    }
+  </script>
+</body>
+</html>
